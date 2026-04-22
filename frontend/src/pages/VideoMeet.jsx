@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import io from "socket.io-client";
-import { Badge, IconButton, TextField } from '@mui/material';
-import { Button } from '@mui/material';
+import { Badge, IconButton, TextField, ToggleButton, ToggleButtonGroup, CircularProgress, Button, Tooltip, Snackbar } from '@mui/material';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import VideocamOffIcon from '@mui/icons-material/VideocamOff'
 import styles from "../styles/videoComponent.module.css";
@@ -11,6 +10,7 @@ import MicOffIcon from '@mui/icons-material/MicOff'
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import StopScreenShareIcon from '@mui/icons-material/StopScreenShare'
 import ChatIcon from '@mui/icons-material/Chat'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import server from '../environment';
 
 const server_url = server;
@@ -48,7 +48,18 @@ export default function VideoMeetComponent() {
 
     let [message, setMessage] = useState("");
 
-    let [newMessages, setNewMessages] = useState(3);
+    let [newMessages, setNewMessages] = useState(0);
+
+    let [chatMode, setChatMode] = useState("room"); // room | ai
+    let [aiMessages, setAiMessages] = useState([]);
+    let [aiMessage, setAiMessage] = useState("");
+    let [aiLoading, setAiLoading] = useState(false);
+    const aiMessagesRef = useRef([]);
+
+    const roomEndRef = useRef(null);
+    const aiEndRef = useRef(null);
+
+    const [toast, setToast] = useState("");
 
     let [askForUsername, setAskForUsername] = useState(true);
 
@@ -65,10 +76,22 @@ export default function VideoMeetComponent() {
     // }
 
     useEffect(() => {
-        console.log("HELLO")
         getPermissions();
+        // run once on mount (prevents rerender loop)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
-    })
+    useEffect(() => {
+        aiMessagesRef.current = aiMessages;
+    }, [aiMessages]);
+
+    useEffect(() => {
+        roomEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, showModal, chatMode]);
+
+    useEffect(() => {
+        aiEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [aiMessages, showModal, chatMode]);
 
     let getDislayMedia = () => {
         if (screen) {
@@ -124,11 +147,8 @@ export default function VideoMeetComponent() {
     useEffect(() => {
         if (video !== undefined && audio !== undefined) {
             getUserMedia();
-            console.log("SET STATE HAS ", video, audio);
-
         }
-
-
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [video, audio])
     let getMedia = () => {
         setVideo(videoAvailable);
@@ -274,15 +294,32 @@ export default function VideoMeetComponent() {
 
 
     let connectToSocketServer = () => {
-        socketRef.current = io.connect(server_url, { secure: false })
+        const token = localStorage.getItem("token");
+        socketRef.current = io.connect(server_url, {
+            transports: ["websocket", "polling"],
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 2000,
+            timeout: 10000,
+            auth: {
+                token: token || undefined,
+                guestName: token ? undefined : (username || "Guest")
+            }
+        })
 
         socketRef.current.on('signal', gotMessageFromServer)
 
         socketRef.current.on('connect', () => {
-            socketRef.current.emit('join-call', window.location.href)
+            socketRef.current.emit('join-call', meetingCode)
             socketIdRef.current = socketRef.current.id
 
             socketRef.current.on('chat-message', addMessage)
+
+            socketRef.current.on('join-error', (msg) => {
+                setToast(String(msg || "Join failed"));
+                window.location.href = "/";
+            });
 
             socketRef.current.on('user-left', (id) => {
                 setVideos((videos) => videos.filter((video) => video.socketId !== id))
@@ -395,6 +432,7 @@ export default function VideoMeetComponent() {
         if (screen !== undefined) {
             getDislayMedia();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [screen])
     let handleScreen = () => {
         setScreen(!screen);
@@ -406,17 +444,6 @@ export default function VideoMeetComponent() {
             tracks.forEach(track => track.stop())
         } catch (e) { }
         window.location.href = "/"
-    }
-
-    let openChat = () => {
-        setModal(true);
-        setNewMessages(0);
-    }
-    let closeChat = () => {
-        setModal(false);
-    }
-    let handleMessage = (e) => {
-        setMessage(e.target.value);
     }
 
     const addMessage = (data, sender, socketIdSender) => {
@@ -432,12 +459,67 @@ export default function VideoMeetComponent() {
 
 
     let sendMessage = () => {
-        console.log(socketRef.current);
-        socketRef.current.emit('chat-message', message, username)
+        const trimmed = message.trim();
+        if (!trimmed) return;
+        if (!socketRef.current) return;
+        socketRef.current.emit('chat-message', trimmed, username)
         setMessage("");
 
         // this.setState({ message: "", sender: username })
     }
+
+    const sendAiMessage = async () => {
+        const trimmed = aiMessage.trim();
+        if (!trimmed || aiLoading) return;
+
+        const nextHistoryMessages = [...aiMessagesRef.current, { sender: username || "You", data: trimmed, role: "user" }];
+        setAiMessages(nextHistoryMessages);
+        setAiMessage("");
+        setAiLoading(true);
+
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch(`${server_url}/api/v1/ai/chat`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                    message: trimmed,
+                    history: nextHistoryMessages
+                        .slice(-10)
+                        .map((m) => ({ role: m.role === "user" ? "user" : "model", text: m.data }))
+                })
+            });
+            const json = await res.json();
+            if (!res.ok) {
+                throw new Error(json?.message || "AI request failed");
+            }
+            setAiMessages((prev) => [...prev, { sender: "AI", data: json.reply, role: "model" }]);
+        } catch (e) {
+            setAiMessages((prev) => [...prev, { sender: "AI", data: `Error: ${e.message}`, role: "model" }]);
+        } finally {
+            setAiLoading(false);
+        }
+    }
+
+    const meetingCode = (() => {
+        const path = window.location.pathname || "";
+        const code = path.startsWith("/") ? path.slice(1) : path;
+        return code || "meeting";
+    })();
+
+    const participantsCount = 1 + (videos?.length || 0);
+
+    const copyInviteLink = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            setToast("Invite link copied");
+        } catch {
+            setToast("Copy failed");
+        }
+    };
 
     
     let connect = () => {
@@ -467,83 +549,176 @@ export default function VideoMeetComponent() {
 
 
                 <div className={styles.meetVideoContainer}>
-
-                    {showModal ? <div className={styles.chatRoom}>
-
-                        <div className={styles.chatContainer}>
-                            <h1>Chat</h1>
-
-                            <div className={styles.chattingDisplay}>
-
-                                {messages.length !== 0 ? messages.map((item, index) => {
-
-                                    console.log(messages)
-                                    return (
-                                        <div style={{ marginBottom: "20px" }} key={index}>
-                                            <p style={{ fontWeight: "bold" }}>{item.sender}</p>
-                                            <p>{item.data}</p>
-                                        </div>
-                                    )
-                                }) : <p>No Messages Yet</p>}
-
-
+                    <div className={styles.topBar}>
+                        <div className={styles.brand}>
+                            <div style={{ fontWeight: 900, fontSize: "1.1rem" }}>LiveLink</div>
+                            <div className={styles.meetingMeta}>
+                                Code: <span style={{ color: "white" }}>{meetingCode}</span> · Participants:{" "}
+                                <span style={{ color: "white" }}>{participantsCount}</span>
                             </div>
-
-                            <div className={styles.chattingArea}>
-                                <TextField value={message} onChange={(e) => setMessage(e.target.value)} id="outlined-basic" label="Enter Your chat" variant="outlined" />
-                                <Button variant='contained' onClick={sendMessage}>Send</Button>
-                            </div>
-
-
                         </div>
-                    </div> : <></>}
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <Tooltip title="Copy invite link">
+                                <IconButton onClick={copyInviteLink} style={{ color: "white" }}>
+                                    <ContentCopyIcon />
+                                </IconButton>
+                            </Tooltip>
+                            <Tooltip title={showModal ? "Hide chat" : "Show chat"}>
+                                <Badge badgeContent={newMessages} max={999} color='orange'>
+                                    <IconButton onClick={() => {
+                                        setModal((v) => !v);
+                                        setNewMessages(0);
+                                    }} style={{ color: "white" }}>
+                                        <ChatIcon />
+                                    </IconButton>
+                                </Badge>
+                            </Tooltip>
+                        </div>
+                    </div>
+
+                    <div className={styles.layoutMain}>
+                        <div className={styles.stage}>
+                            <div className={styles.conferenceView}>
+                                {videos.map((video) => (
+                                    <div key={video.socketId}>
+                                        <video
+                                            data-socket={video.socketId}
+                                            ref={ref => {
+                                                if (ref && video.stream) {
+                                                    ref.srcObject = video.stream;
+                                                }
+                                            }}
+                                            autoPlay
+                                            playsInline
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className={styles.localPip}>
+                                <video ref={localVideoref} autoPlay muted playsInline />
+                            </div>
+                        </div>
+
+                        {showModal ? (
+                            <div className={styles.chatPanel}>
+                                <div className={styles.chatHeader}>
+                                    <div className={styles.chatTitleRow}>
+                                        <div style={{ fontWeight: 900 }}>Chat</div>
+                                        <ToggleButtonGroup
+                                            exclusive
+                                            value={chatMode}
+                                            onChange={(e, v) => v && setChatMode(v)}
+                                            size="small"
+                                        >
+                                            <ToggleButton value="room">Room</ToggleButton>
+                                            <ToggleButton value="ai">AI</ToggleButton>
+                                        </ToggleButtonGroup>
+                                    </div>
+                                    <div style={{ fontSize: "0.85rem", opacity: 0.75 }}>
+                                        {chatMode === "ai" ? "Private Gemini chat (only you can see it)" : "Room chat (everyone in meeting)"}
+                                    </div>
+                                </div>
+
+                                <div className={styles.chattingDisplay}>
+                                    {chatMode === "room" ? (
+                                        messages.length !== 0 ? messages.map((item, index) => {
+                                            const isMe = item.sender === username;
+                                            return (
+                                                <div className={styles.msgRow} key={index}>
+                                                    <div className={`${styles.msgBubble} ${isMe ? styles.msgBubbleMe : ""}`}>
+                                                        <div className={styles.msgSender}>{item.sender}</div>
+                                                        <div style={{ whiteSpace: "pre-wrap" }}>{item.data}</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }) : <div style={{ opacity: 0.75 }}>No messages yet</div>
+                                    ) : (
+                                        aiMessages.length !== 0 ? aiMessages.map((item, index) => {
+                                            const isMe = item.role === "user";
+                                            return (
+                                                <div className={styles.msgRow} key={index}>
+                                                    <div className={`${styles.msgBubble} ${isMe ? styles.msgBubbleMe : ""}`}>
+                                                        <div className={styles.msgSender}>{item.sender}</div>
+                                                        <div style={{ whiteSpace: "pre-wrap" }}>{item.data}</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }) : <div style={{ opacity: 0.75 }}>Ask the AI anything (private)</div>
+                                    )}
+                                    <div ref={chatMode === "room" ? roomEndRef : aiEndRef} />
+                                </div>
+
+                                <div className={styles.chattingArea}>
+                                    {chatMode === "room" ? (
+                                        <>
+                                            <TextField
+                                                value={message}
+                                                onChange={(e) => setMessage(e.target.value)}
+                                                id="outlined-basic"
+                                                label="Message"
+                                                variant="outlined"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") sendMessage();
+                                                }}
+                                            />
+                                            <Button variant='contained' onClick={sendMessage}>Send</Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <TextField
+                                                value={aiMessage}
+                                                onChange={(e) => setAiMessage(e.target.value)}
+                                                id="outlined-ai"
+                                                label="Ask AI"
+                                                variant="outlined"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") sendAiMessage();
+                                                }}
+                                            />
+                                            <Button variant='contained' onClick={sendAiMessage} disabled={aiLoading}>
+                                                {aiLoading ? <CircularProgress size={18} /> : "Send"}
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
 
 
                     <div className={styles.buttonContainers}>
+                        <Tooltip title={video === true ? "Turn camera off" : "Turn camera on"}>
                         <IconButton onClick={handleVideo} style={{ color: "white" }}>
                             {(video === true) ? <VideocamIcon /> : <VideocamOffIcon />}
                         </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Leave call">
                         <IconButton onClick={handleEndCall} style={{ color: "red" }}>
                             <CallEndIcon  />
                         </IconButton>
+                        </Tooltip>
+                        <Tooltip title={audio === true ? "Mute" : "Unmute"}>
                         <IconButton onClick={handleAudio} style={{ color: "white" }}>
                             {audio === true ? <MicIcon /> : <MicOffIcon />}
                         </IconButton>
+                        </Tooltip>
 
                         {screenAvailable === true ?
-                            <IconButton onClick={handleScreen} style={{ color: "white" }}>
-                                {screen === true ? <ScreenShareIcon /> : <StopScreenShareIcon />}
-                            </IconButton> : <></>}
-
-                        <Badge badgeContent={newMessages} max={999} color='orange'>
-                            <IconButton onClick={() => setModal(!showModal)} style={{ color: "white" }}>
-                                <ChatIcon />                        </IconButton>
-                        </Badge>
+                            <Tooltip title={screen === true ? "Stop share" : "Share screen"}>
+                                <IconButton onClick={handleScreen} style={{ color: "white" }}>
+                                    {screen === true ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                                </IconButton>
+                            </Tooltip> : <></>}
 
                     </div>
 
-
-                    <video className={styles.meetUserVideo} ref={localVideoref} autoPlay muted></video>
-
-                    <div className={styles.conferenceView}>
-                        {videos.map((video) => (
-                            <div key={video.socketId}>
-                                <video
-
-                                    data-socket={video.socketId}
-                                    ref={ref => {
-                                        if (ref && video.stream) {
-                                            ref.srcObject = video.stream;
-                                        }
-                                    }}
-                                    autoPlay
-                                >
-                                </video>
-                            </div>
-
-                        ))}
-
-                    </div>
+                    <Snackbar
+                        open={!!toast}
+                        autoHideDuration={2000}
+                        message={toast}
+                        onClose={() => setToast("")}
+                    />
 
                 </div>
 

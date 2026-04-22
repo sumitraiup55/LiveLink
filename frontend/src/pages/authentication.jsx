@@ -2,22 +2,11 @@
 import * as React from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import { Snackbar, Button, TextField, Box, Typography, Paper, useMediaQuery, CircularProgress } from '@mui/material';
-import { styled, useTheme, createTheme, ThemeProvider } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
-
-const defaultTheme = createTheme({
-  palette: {
-    primary: { main: '#f9881fff' },
-    secondary: { main: '#22223B' },
-  },
-  typography: {
-    fontFamily: 'Poppins, sans-serif',
-  },
-});
-
 const GlassCard = styled(Paper)(({ theme }) => ({
-  background: 'rgba(253, 253, 253, 0.85)',
+  background: 'rgba(10, 15, 30, 0.55)',
   borderRadius: 24,
   boxShadow: '0 8px 32px 0 rgba(31,38,135,0.15)',
   padding: theme.spacing(3, 2),
@@ -72,35 +61,39 @@ export default function Authentication() {
   };
 
   return (
-    <ThemeProvider theme={defaultTheme}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        width: '100vw',
+        background: `radial-gradient(1200px 800px at 15% 20%, rgba(255,152,57,0.25), transparent 60%),
+                     radial-gradient(900px 700px at 85% 30%, rgba(108,99,255,0.22), transparent 55%),
+                     linear-gradient(120deg, #0b1020 0%, #0a0f1e 100%)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        p: { xs: 2, md: 4 },
+      }}
+    >
       <Box
         sx={{
-          minHeight: '100vh',
-          width: '100vw',
-          background: `linear-gradient(120deg, #985935ff 0%, #29293B 100%)`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          overflow: 'hidden',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: `url(/logo3.png) no-repeat right bottom/contain`,
+          opacity: 0.06,
+          zIndex: 0,
         }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            background: `url(/logo3.png) no-repeat right bottom/contain`,
-            opacity: 0.08,
-            zIndex: 0,
-          }}
-        />
-        <GlassCard elevation={8}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
-            <Box sx={{
-              background: 'linear-gradient(135deg, #FF9839 60%, #22223B 100%)',
+      />
+
+      <GlassCard elevation={10} sx={{ zIndex: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
+          <Box
+            sx={{
+              background: 'linear-gradient(135deg, rgba(255,152,57,1) 0%, rgba(108,99,255,1) 100%)',
               borderRadius: '50%',
               width: 64,
               height: 64,
@@ -108,93 +101,109 @@ export default function Authentication() {
               alignItems: 'center',
               justifyContent: 'center',
               mb: 1,
-              boxShadow: '0 4px 16px 0 rgba(31,38,135,0.10)'
-            }}>
-              <LockOutlinedIcon sx={{ color: '#fff', fontSize: 36 }} />
-            </Box>
-            <Typography variant="h5" fontWeight={700} color="secondary.main" gutterBottom>
-              {formState === 0 ? 'Sign In to LiveLink' : 'Create your account'}
-            </Typography>
+              boxShadow: '0 12px 30px rgba(0,0,0,0.35)',
+            }}
+          >
+            <LockOutlinedIcon sx={{ color: '#0b1020', fontSize: 34 }} />
           </Box>
-          <Box component="form" noValidate sx={{ width: '100%' }}>
-            {formState === 1 && (
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                id="name"
-                label="Full Name"
-                name="name"
-                value={name}
-                autoFocus
-                onChange={(e) => setName(e.target.value)}
-                sx={{ mb: 2 }}
-              />
-            )}
+          <Typography variant={isMobile ? "h5" : "h4"} fontWeight={800} gutterBottom>
+            {formState === 0 ? 'Welcome back' : 'Create your account'}
+          </Typography>
+          <Typography sx={{ opacity: 0.8, textAlign: "center" }}>
+            {formState === 0 ? 'Sign in to start meetings and chat with AI.' : 'Join LiveLink in seconds.'}
+          </Typography>
+        </Box>
+
+        <Box component="form" noValidate sx={{ width: '100%' }}>
+          {formState === 1 && (
             <TextField
               margin="normal"
               required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              value={username}
-              autoFocus={formState === 0}
-              onChange={(e) => setUsername(e.target.value)}
-              sx={{ mb: 2 }}
+              id="name"
+              label="Full Name"
+              name="name"
+              value={name}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              sx={{ mb: 1.5 }}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              value={password}
-              type="password"
-              onChange={(e) => setPassword(e.target.value)}
-              id="password"
-              sx={{ mb: 2 }}
-            />
-            {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
+          )}
+
+          <TextField
+            margin="normal"
+            required
+            id="username"
+            label="Username"
+            name="username"
+            value={username}
+            autoFocus={formState === 0}
+            onChange={(e) => setUsername(e.target.value)}
+            sx={{ mb: 1.5 }}
+          />
+
+          <TextField
+            margin="normal"
+            required
+            name="password"
+            label="Password"
+            value={password}
+            type="password"
+            onChange={(e) => setPassword(e.target.value)}
+            id="password"
+            sx={{ mb: 1.5 }}
+          />
+
+          {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
+
+          <Button
+            type="button"
+            fullWidth
+            variant="contained"
+            size="large"
+            sx={{
+              mt: 0.5,
+              mb: 2,
+              borderRadius: 2,
+              fontWeight: 800,
+              fontSize: '1.05rem',
+              letterSpacing: 0.2,
+              background: "linear-gradient(90deg, rgba(255,152,57,1) 0%, rgba(108,99,255,1) 100%)",
+              color: "#0b1020",
+            }}
+            onClick={handleAuth}
+            disabled={loading}
+            endIcon={loading && <CircularProgress size={20} color="inherit" />}
+          >
+            {formState === 0 ? "Login" : "Register"}
+          </Button>
+
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
             <Button
-              type="button"
-              fullWidth
-              variant="contained"
-              size="large"
-              sx={{ mt: 1, mb: 2, borderRadius: 2, fontWeight: 600, fontSize: '1.1rem', letterSpacing: 1 }}
-              onClick={handleAuth}
-              disabled={loading}
-              endIcon={loading && <CircularProgress size={20} color="inherit" />}
+              variant={formState === 0 ? 'outlined' : 'text'}
+              color="inherit"
+              onClick={() => setFormState(0)}
+              sx={{ borderRadius: 2, fontWeight: 700 }}
             >
-              {formState === 0 ? "Login" : "Register"}
+              Sign In
             </Button>
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-              <Button
-                variant={formState === 0 ? 'contained' : 'text'}
-                color={formState === 0 ? 'primary' : 'secondary'}
-                onClick={() => setFormState(0)}
-                sx={{ borderRadius: 2, fontWeight: 500 }}
-              >
-                Sign In
-              </Button>
-              <Button
-                variant={formState === 1 ? 'contained' : 'text'}
-                color={formState === 1 ? 'primary' : 'secondary'}
-                onClick={() => setFormState(1)}
-                sx={{ borderRadius: 2, fontWeight: 500 }}
-              >
-                Sign Up
-              </Button>
-            </Box>
+            <Button
+              variant={formState === 1 ? 'outlined' : 'text'}
+              color="inherit"
+              onClick={() => setFormState(1)}
+              sx={{ borderRadius: 2, fontWeight: 700 }}
+            >
+              Sign Up
+            </Button>
           </Box>
-        </GlassCard>
-        <Snackbar
-          open={open}
-          autoHideDuration={4000}
-          message={message}
-          onClose={() => setOpen(false)}
-        />
-      </Box>
-    </ThemeProvider>
+        </Box>
+      </GlassCard>
+
+      <Snackbar
+        open={open}
+        autoHideDuration={4000}
+        message={message}
+        onClose={() => setOpen(false)}
+      />
+    </Box>
   );
 }

@@ -1,124 +1,105 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AppBar, Box, Button, Container, Toolbar, Typography, Stack, Paper } from "@mui/material";
 
 export default function LandingPage() {
   const router = useNavigate();
-  // Responsive breakpoints
-  const isMobile = window.innerWidth <= 600;
-  const isTablet = window.innerWidth > 600 && window.innerWidth <= 900;
   return (
-    <div style={{
-      minHeight: '100vh',
-      width: '100vw',
-      background: 'linear-gradient(120deg, #986b41ff 0%, #292958ff 100%)',
-      color: 'white',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      <nav style={{
-        padding: isMobile ? '1rem 0.5rem' : isTablet ? '1.2rem 1.2rem' : '1.5rem 2.5rem',
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: 'rgba(34,34,59,0.15)',
-        backdropFilter: 'blur(4px)',
-        gap: isMobile ? '1rem' : 0,
-      }}>
-        <div className='navHeader'>
-          <h2 style={{ fontWeight: 700, fontSize: '2rem', letterSpacing: 1 }}>LiveLink</h2>
-        </div>
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          <button onClick={() => router("/aljk23")}
-            style={{
-              background: 'linear-gradient(90deg, #ae7540ff 60%, #7575caff 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 16,
-              padding: '0.7rem 1.5rem',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px 0 rgba(31,38,135,0.10)'
-            }}>
-            Join as Guest
-          </button>
-          <button onClick={() => router("/auth")}
-            style={{
-              background: 'transparent',
-              color: '#dc7718ff',
-              border: '2px solid #de730fff',
-              borderRadius: 16,
-              padding: '0.7rem 1.5rem',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: 'pointer',
-              transition: 'background 0.2s',
-            }}>
-            Register
-          </button>
-          <button onClick={() => router("/auth")}
-            style={{
-              background: '#0808b3ff',
-              color: 'white',
-              border: 'none',
-              borderRadius: 16,
-              padding: '0.7rem 1.5rem',
-              fontWeight: 600,
-              fontSize: '1rem',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px 0 rgba(52, 65, 245, 0.1)'
-            }}>
-            Login
-          </button>
-        </div>
-      </nav>
-      <main style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: isMobile ? '2rem' : isTablet ? '2.5rem' : '4vw',
-        padding: isMobile ? '1rem 0.5rem' : isTablet ? '1.5rem 1rem' : '2rem 1rem',
-        width: '100%',
-      }}>
-        <div style={{ maxWidth: isMobile ? 340 : isTablet ? 400 : 500, width: '100%' }}>
-          <h1 style={{ fontSize: isMobile ? '2rem' : isTablet ? '2.2rem' : '2.7rem', fontWeight: 800, lineHeight: 1.1, textAlign: isMobile ? 'center' : 'left' }}>
-            <span style={{ color: "#fc8626ff" }}>Connect</span> with your loved Ones
-          </h1>
-          <p style={{ fontSize: isMobile ? '1rem' : '1.2rem', margin: isMobile ? '1rem 0 2rem 0' : '1.5rem 0 2.5rem 0', color: '#e1cbcbff', textAlign: isMobile ? 'center' : 'left' }}>
-            Cover a distance by Video Call
-          </p>
-          <div style={{ display: 'flex', justifyContent: isMobile ? 'center' : 'flex-start' }}>
-            <Link to={"/auth"} style={{
-              background: '#cd6e01ff',
-              color: 'white',
-              textDecoration: 'none',
-              padding: isMobile ? '0.8rem 1.5rem' : '1rem 2.5rem',
-              borderRadius: 20,
-              fontWeight: 700,
-              fontSize: isMobile ? '1.1rem' : '1.3rem',
-              boxShadow: '0 2px 8px 0 rgba(43, 51, 159, 0.1)'
-            }}>
-              Get Started
-            </Link>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isMobile ? '100%' : 'auto' }}>
-          <video
+    <Box
+      sx={{
+        minHeight: "100vh",
+        width: "100vw",
+        background: `radial-gradient(1200px 800px at 10% 15%, rgba(255,152,57,0.25), transparent 60%),
+                     radial-gradient(900px 700px at 90% 25%, rgba(108,99,255,0.20), transparent 55%),
+                     linear-gradient(120deg, #0b1020 0%, #0a0f1e 100%)`,
+        color: "white",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <AppBar position="sticky" elevation={0} sx={{ background: "rgba(10,15,30,0.45)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <Toolbar>
+          <Container maxWidth="lg" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: { xs: 0, sm: 2 } }}>
+            <Typography variant="h5" fontWeight={900} letterSpacing={0.4}>
+              LiveLink
+            </Typography>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => router(`/${Math.random().toString(36).slice(2, 8)}`)}
+              >
+                Join as guest
+              </Button>
+              <Button variant="text" color="inherit" onClick={() => router("/auth")}>
+                Register
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => router("/auth")}
+                sx={{
+                  background: "linear-gradient(90deg, rgba(255,152,57,1) 0%, rgba(108,99,255,1) 100%)",
+                  color: "#0b1020",
+                }}
+              >
+                Login
+              </Button>
+            </Stack>
+          </Container>
+        </Toolbar>
+      </AppBar>
+
+      <Container maxWidth="lg" sx={{ flex: 1, display: "grid", alignItems: "center", py: { xs: 5, md: 10 }, gap: { xs: 4, md: 6 }, gridTemplateColumns: { xs: "1fr", md: "1.15fr 0.85fr" } }}>
+        <Box>
+          <Typography variant="h3" sx={{ lineHeight: 1.08 }}>
+            Connect. Meet. <Box component="span" sx={{ color: "primary.main" }}>Feel closer</Box>.
+          </Typography>
+          <Typography sx={{ opacity: 0.85, mt: 2, fontSize: { xs: "1.05rem", md: "1.2rem" } }}>
+            High‑quality video calls, real‑time chat, and a private Gemini AI assistant—built for smooth meetings.
+          </Typography>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 4, alignItems: { xs: "stretch", sm: "center" } }}>
+            <Button
+              component={Link}
+              to="/auth"
+              size="large"
+              variant="contained"
+              sx={{
+                background: "linear-gradient(90deg, rgba(255,152,57,1) 0%, rgba(108,99,255,1) 100%)",
+                color: "#0b1020",
+                py: 1.2,
+              }}
+            >
+              Get started
+            </Button>
+            <Button
+              size="large"
+              variant="outlined"
+              color="inherit"
+              onClick={() => router("/auth")}
+              sx={{ py: 1.2 }}
+            >
+              Create account
+            </Button>
+          </Stack>
+        </Box>
+
+        <Paper sx={{ p: 2, borderRadius: 4, overflow: "hidden" }}>
+          <Box
+            component="video"
             src="https://shorturl.at/ZpNzc"
             autoPlay
             muted
             loop
             playsInline
-            style={{ width: isMobile ? '90vw' : '100%', maxWidth: isMobile ? 220 : 350, borderRadius: "18px", boxShadow: '0 4px 24px 0 rgba(30, 36, 122, 0.1)' }}
+            sx={{ width: "100%", height: { xs: 260, md: 380 }, objectFit: "cover", borderRadius: 3 }}
           />
-        </div>
-      </main>
-      <footer style={{ textAlign: 'center', padding: '1rem', color: '#fff8', fontSize: '1rem' }}>
-        &copy; {new Date().getFullYear()} Videocall. All rights reserved.
-      </footer>
-    </div>
+        </Paper>
+      </Container>
+
+      <Box component="footer" sx={{ textAlign: "center", py: 3, opacity: 0.7 }}>
+        &copy; {new Date().getFullYear()} LiveLink. All rights reserved.
+      </Box>
+    </Box>
   );
 }

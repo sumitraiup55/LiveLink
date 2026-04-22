@@ -1,13 +1,17 @@
 import express from "express";
 import { createServer } from "node:http";
 
-import { Server } from "socket.io";
-
 import mongoose from "mongoose";
 import { connectToSocket } from "./controllers/socketManager.js";
 
 import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import dotenv from "dotenv";
 import userRoutes from "./routes/users.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
+
+dotenv.config();
 
 const app = express();
 const server = createServer(app);
@@ -15,17 +19,28 @@ const io = connectToSocket(server);
 
 
 app.set("port", (process.env.PORT || 8000))
-app.use(cors());
+app.use(helmet());
+app.use(compression());
+app.use(cors({
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : "*",
+    credentials: true
+}));
 app.use(express.json({ limit: "40kb" }));
 app.use(express.urlencoded({ limit: "40kb", extended: true }));
 
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/ai", aiRoutes);
+
+app.get("/health", (req, res) => res.json({ ok: true }));
 
 const start = async () => {
-    app.set("mongo_user")
-    const connectionDb = await mongoose.connect("mongodb+srv://sumitraiup555:Sumit%40123@cluster0.7gwvn82.mongodb.net/")
+    const mongoUri = process.env.MONGO_URI;
+    if (!mongoUri) {
+        throw new Error("Missing MONGO_URI in environment.");
+    }
 
-    console.log(`MONGO Connected DB HOst: ${connectionDb.connection.host}`)
+    const connectionDb = await mongoose.connect(mongoUri);
+    console.log(`MONGO Connected DB Host: ${connectionDb.connection.host}`)
     server.listen(app.get("port"), () => {
         console.log("LISTENIN ON PORT 8000")
     });
