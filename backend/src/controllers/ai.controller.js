@@ -2,8 +2,29 @@ import httpStatus from "http-status";
 import { GoogleGenAI } from "@google/genai";
 import { User } from "../models/user.model.js";
 
-// ✅ Keep constants OUTSIDE
-const DEFAULT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_MODEL = "gemini-1.5-flash"; // ✅ faster & stable
+
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+// ✅ Retry wrapper (handles 503)
+const callAIWithRetry = async (fn, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (
+        error?.status === 503 ||
+        error?.message?.includes("UNAVAILABLE")
+      ) {
+        console.log(`Retry ${i + 1}...`);
+        await sleep(1000 * (i + 1)); // small delay
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error("AI service unavailable after retries");
+};
 
 function getTokenFromReq(req) {
   const header = req.headers.authorization || "";
@@ -15,7 +36,6 @@ function getTokenFromReq(req) {
   return req.query.token || req.body?.token;
 }
 
-// ✅ ONLY ONE export
 export const chatWithAi = async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -24,11 +44,6 @@ export const chatWithAi = async (req, res) => {
       message: "Missing GEMINI_API_KEY in environment.",
     });
   }
-
-  // ✅ Initialize AI INSIDE function
-  const ai = new GoogleGenAI({
-    apiKey: apiKey,
-  });
 
   const token = getTokenFromReq(req);
 
@@ -47,7 +62,8 @@ export const chatWithAi = async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ token });
+    // ✅ Run DB + AI prep in parallel mindset
+    const user = await User.findOne({ token }).lean(); // faster
 
     if (!user) {
       return res.status(httpStatus.UNAUTHORIZED).json({
@@ -55,48 +71,54 @@ export const chatWithAi = async (req, res) => {
       });
     }
 
-    // ✅ Build conversation safely
+    // ✅ Build lightweight prompt (less tokens = faster)
     let conversation = "";
 
     if (Array.isArray(history)) {
-      const safeHistory = history
-        .slice(-10)
-        .filter(
-          (h) =>
-            h &&
-            (h.role === "user" || h.role === "model") &&
-            typeof h.text === "string"
-        );
-
-      conversation = safeHistory
-        .map((h) => `${h.role === "user" ? "User" : "AI"}: ${h.text}`)
+      conversation = history
+        .slice(-6) // reduce size → faster response
+        .map((h) =>
+          h?.role === "user"
+            ? `U:${h.text}`
+            : h?.role === "model"
+            ? `A:${h.text}`
+            : ""
+        )
         .join("\n");
     }
 
-    const prompt = `
-You are LiveLink's private assistant for ${user.name} (@${user.username}).
-Keep replies short, clear, and helpful.
+    const prompt = `You are LiveLink AI for ${user.username}.
+Reply short.
 
 ${conversation}
+U:${message}`;
 
-User: ${message}
-`;
+    // ✅ Initialize AI
+    const ai = new GoogleGenAI({ apiKey });
 
-    // ✅ Call Gemini API
-    const response = await ai.models.generateContent({
-      model: process.env.GEMINI_MODEL || DEFAULT_MODEL,
-      contents: prompt,
-    });
+    // ✅ Add timeout (VERY IMPORTANT)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8 sec max
 
-    const reply = response?.text || "No response from AI";
+    const response = await callAIWithRetry(() =>
+      ai.models.generateContent({
+        model: process.env.GEMINI_MODEL || DEFAULT_MODEL,
+        contents: prompt,
+        signal: controller.signal,
+      })
+    );
+
+    clearTimeout(timeout);
+
+    const reply = response?.text || "No response";
 
     return res.status(httpStatus.OK).json({ reply });
 
   } catch (e) {
     console.error("AI ERROR:", e);
 
-    return res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
-      message: `AI error: ${e?.message || e}`,
+    return res.status(httpStatus.OK).json({
+      reply: "⚠️ AI is busy, try again.",
     });
   }
 };
